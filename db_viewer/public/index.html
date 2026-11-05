@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>DB Viewer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ───────────── Connect screen (settings/input → orange accent) ───────────── -->
+<section id="connectView" class="connect-view" hidden>
+  <div class="connect-card">
+    <header class="connect-head">
+      <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/></svg>
+      <h1>DB Viewer</h1>
+      <span class="muted">PostgreSQL 읽기 전용 뷰어</span>
+    </header>
+
+    <div class="profiles" id="profileBar" hidden>
+      <label for="profileSelect">저장된 연결</label>
+      <select id="profileSelect" class="ctl"></select>
+      <button type="button" class="btn" id="profileDelete" title="저장된 연결 삭제">삭제</button>
+    </div>
+
+    <form id="connectForm" class="form-grid" autocomplete="off">
+      <label for="f_host">호스트</label>
+      <input id="f_host" name="host" class="ctl" placeholder="db.example.com 또는 10.0.0.5" required autocapitalize="off" spellcheck="false">
+
+      <label for="f_port">포트</label>
+      <input id="f_port" name="port" class="ctl num" type="number" inputmode="numeric" value="5432" min="1" max="65535">
+
+      <label for="f_database">DB 이름</label>
+      <input id="f_database" name="database" class="ctl" placeholder="postgres" required autocapitalize="off" spellcheck="false">
+
+      <label for="f_user">계정</label>
+      <input id="f_user" name="user" class="ctl" placeholder="readonly_user" required autocapitalize="off" spellcheck="false" autocomplete="username">
+
+      <label for="f_password">비밀번호</label>
+      <input id="f_password" name="password" class="ctl" type="password" autocomplete="current-password">
+
+      <label for="f_ssl">SSL</label>
+      <select id="f_ssl" name="ssl" class="ctl">
+        <option value="disable">사용 안 함</option>
+        <option value="require">require (인증서 검증 안 함)</option>
+        <option value="verify-full">verify-full (인증서 검증)</option>
+      </select>
+
+      <label for="f_name">연결 이름</label>
+      <input id="f_name" name="name" class="ctl" placeholder="(선택) 운영 DB">
+
+      <span></span>
+      <div class="checks">
+        <label><input type="checkbox" id="f_save" checked> 이 기기에 연결 정보 저장</label>
+        <label><input type="checkbox" id="f_savepw"> 비밀번호도 저장</label>
+      </div>
+
+      <span></span>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-orange" id="connectBtn">연결</button>
+        <span id="connectMsg" class="msg" role="status"></span>
+      </div>
+    </form>
+    <p class="note muted">모든 조회는 READ ONLY 트랜잭션으로 실행되며 데이터를 변경하지 않습니다.</p>
+  </div>
+</section>
+
+<!-- ───────────── Viewer screen (data → green accent) ───────────── -->
+<section id="appView" class="app-view" hidden>
+  <header class="topbar">
+    <button type="button" class="btn icon-btn only-mobile" id="drawerBtn" aria-label="테이블 목록">
+      <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+    </button>
+    <strong class="brand">DB Viewer</strong>
+    <span class="conn-info" id="connInfo"></span>
+    <span class="spacer"></span>
+    <button type="button" class="btn" id="disconnectBtn">연결 해제</button>
+  </header>
+
+  <div class="body">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-head">
+        <input id="tableFilter" class="ctl" type="search" placeholder="테이블 검색" autocapitalize="off" spellcheck="false">
+      </div>
+      <ul class="table-list" id="tableList" role="listbox" aria-label="테이블"></ul>
+      <div class="side-foot muted" id="tableCount"></div>
+    </aside>
+    <div class="backdrop" id="backdrop" hidden></div>
+
+    <main class="main">
+      <div class="toolbar">
+        <span class="tbl-title" id="tblTitle">테이블을 선택하세요</span>
+        <span class="tool-group">
+          <select id="searchCol" class="ctl" title="검색 컬럼"><option value="">전체 컬럼</option></select>
+          <input id="searchBox" class="ctl search" type="search" placeholder="검색" autocapitalize="off" spellcheck="false">
+        </span>
+        <span class="tool-group">
+          <button type="button" class="btn icon-btn" id="prevBtn" aria-label="이전 페이지">
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>
+          </button>
+          <span class="pager" id="pagerInfo">–</span>
+          <button type="button" class="btn icon-btn" id="nextBtn" aria-label="다음 페이지">
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>
+          </button>
+          <select id="pageSize" class="ctl" title="페이지 크기">
+            <option>50</option><option selected>100</option><option>200</option><option>500</option><option>1000</option>
+          </select>
+        </span>
+        <span class="tool-group">
+          <button type="button" class="btn toggle" id="selectModeBtn" aria-pressed="false" title="터치로 셀 범위 선택">범위선택</button>
+          <button type="button" class="btn" id="copyBtn" title="선택한 셀 복사 (Ctrl+C)">복사</button>
+          <button type="button" class="btn" id="detailBtn" title="선택 행 상세 보기">상세</button>
+          <button type="button" class="btn icon-btn" id="refreshBtn" aria-label="새로고침">
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5"/></svg>
+          </button>
+        </span>
+      </div>
+
+      <div class="grid-wrap" id="gridWrap" tabindex="0" aria-label="데이터 표">
+        <div class="empty muted" id="emptyMsg">왼쪽 목록에서 테이블을 선택하세요.</div>
+        <table class="grid" id="grid" hidden></table>
+      </div>
+
+      <footer class="statusbar">
+        <span id="statusLeft" role="status"></span>
+        <span class="spacer"></span>
+        <span id="statusRight"></span>
+      </footer>
+    </main>
+  </div>
+</section>
+
+<!-- Row detail sheet -->
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-panel">
+    <div class="sheet-head">
+      <strong id="sheetTitle">행 상세</strong>
+      <span class="spacer"></span>
+      <button type="button" class="btn icon-btn" id="sheetPrev" aria-label="이전 행"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 10 5-5 5 5"/></svg></button>
+      <button type="button" class="btn icon-btn" id="sheetNext" aria-label="다음 행"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg></button>
+      <button type="button" class="btn" id="sheetClose">닫기</button>
+    </div>
+    <div class="sheet-body"><table class="kv" id="sheetTable"></table></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

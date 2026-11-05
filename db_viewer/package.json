@@ -1,0 +1,19 @@
+{
+  "name": "db_viewer",
+  "version": "1.0.0",
+  "description": "Mobile-friendly read-only PostgreSQL table viewer",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@fontsource/inter": "^5.2.6",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
+  }
+}
